@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://docs.google.com" crossorigin>
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://lh3.googleusercontent.com" crossorigin>
+<link rel="dns-prefetch" href="//googleusercontent.com">
 <title>ARCHIVE Portfolio</title>
 <style>
 html,body,#app{width:100%;height:100%;margin:0;overflow:hidden;background:#000}
@@ -46,8 +50,11 @@ const VIDEO_SLIDES=new Set([
 ]);
 const app=document.getElementById('app');
 const isMobile=matchMedia('(max-width:700px)').matches;
-const KEEP_BEHIND=isMobile?1:2;
-const KEEP_AHEAD=isMobile?2:3;
+const memoryGB=Number(navigator.deviceMemory||0);
+const lowMemory=memoryGB>0&&memoryGB<=4;
+const KEEP_BEHIND=1;
+const KEEP_AHEAD=isMobile?(lowMemory?2:3):(lowMemory?3:5);
+const IDLE_AHEAD=isMobile?(lowMemory?0:1):(lowMemory?1:2);
 app.innerHTML='<div class="status">LOADING PORTFOLIO</div>';
 
 const normalize=projects=>(projects||[]).flatMap(p=>{
@@ -186,10 +193,23 @@ function mountWindow(center){
 const start=Math.max(0,center-KEEP_BEHIND);
 const end=Math.min(slides.length-1,center+KEEP_AHEAD);
 for(const i of [...mounted]){
-if(i<start||i>end)sections[i]._unmount();
+if(i<start||i>end+IDLE_AHEAD)sections[i]._unmount();
 }
 for(let i=start;i<=end;i++)sections[i]._mount();
+const idle=window.requestIdleCallback||((fn)=>setTimeout(fn,350));
+if(IDLE_AHEAD) idle(()=>{
+if(document.visibilityState!=='visible')return;
+for(let i=end+1;i<=Math.min(slides.length-1,end+IDLE_AHEAD);i++)sections[i]._mount();
+},{timeout:1000});
 }
+
+const predictive=new IntersectionObserver(entries=>{
+for(const e of entries){
+if(!e.isIntersecting)continue;
+const i=Number(e.target.dataset.index);
+for(let n=Math.max(0,i-1);n<=Math.min(slides.length-1,i+KEEP_AHEAD);n++)sections[n]._mount();
+}
+},{root:scroller,rootMargin:'180% 0px 260% 0px',threshold:.01});
 
 const active=new IntersectionObserver(entries=>{
 for(const e of entries){
@@ -200,7 +220,7 @@ mountWindow(i);
 }
 }
 },{root:scroller,threshold:[.58]});
-sections.forEach(s=>active.observe(s));
+sections.forEach(s=>{predictive.observe(s);active.observe(s)});
 updateCounter(0);
 mountWindow(0);
 

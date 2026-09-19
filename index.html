@@ -14,9 +14,9 @@ html,body,#app{width:100%;height:100%;margin:0;overflow:hidden;background:#000}
 body{font-family:Arial,Helvetica,sans-serif}
 *{box-sizing:border-box}
 .viewer{width:100vw;height:100dvh;position:relative;overflow:hidden;background:#000;color:#aaa;user-select:none}
-.portfolio-scroll{width:100%;height:100%;overflow-x:hidden;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior-y:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.portfolio-scroll{width:100%;height:100%;overflow-x:hidden;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior-y:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
 .portfolio-scroll::-webkit-scrollbar{display:none}
-.portfolio-page{width:100%;height:100dvh;min-height:100dvh;display:flex;align-items:center;justify-content:center;scroll-snap-align:start;scroll-snap-stop:always;background:#000}
+.portfolio-page{width:100%;height:100dvh;min-height:100dvh;display:flex;align-items:center;justify-content:center;scroll-snap-align:start;scroll-snap-stop:normal;background:#000;contain:layout paint style;content-visibility:auto;contain-intrinsic-size:auto 100dvh}
 .slide-stage{width:min(100vw,calc(100dvh * 2.41351));aspect-ratio:28575000/11839575;max-height:100dvh;position:relative;overflow:hidden;background:#fff}
 .loading-label{position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;background:#fff;color:#aaa;font-size:10px;letter-spacing:.18em;pointer-events:none}
 .loading-label.retry{pointer-events:auto;cursor:pointer}
@@ -63,22 +63,20 @@ const slideIds=p.slideIds.filter(id=>id&&!MENU_SLIDE_IDS.has(id));
 return slideIds.length?[{name:p.name,presentationId:p.presentationId,slideIds}]:[];
 });
 
-async function getProjects(){
+function cachedProjects(){
 try{
+const raw=JSON.parse(localStorage.getItem('archivePortfolioFeed')||'[]');
+return normalize(Array.isArray(raw)?raw:(raw.projects||[]));
+}catch(_){return[]}
+}
+async function fetchFreshProjects(){
 const r=await fetch(CONTROL_URL+'?t='+Date.now(),{cache:'no-store'});
 if(!r.ok)throw new Error('feed');
 const data=await r.json();
 const projects=normalize(data.projects);
 if(!data.ok||!projects.length)throw new Error('feed');
-localStorage.setItem('archivePortfolioFeed',JSON.stringify(projects));
+localStorage.setItem('archivePortfolioFeed',JSON.stringify({projects,savedAt:Date.now()}));
 return projects;
-}catch(e){
-try{
-const cached=normalize(JSON.parse(localStorage.getItem('archivePortfolioFeed')||'[]'));
-if(cached.length)return cached;
-}catch(_){}
-throw e;
-}
 }
 
 function render(projects){
@@ -189,27 +187,38 @@ sections.push(section);
 scroller.appendChild(section);
 });
 
+let preloadEpoch=0;
 function mountWindow(center){
+const epoch=++preloadEpoch;
 const start=Math.max(0,center-KEEP_BEHIND);
 const end=Math.min(slides.length-1,center+KEEP_AHEAD);
 for(const i of [...mounted]){
 if(i<start||i>end+IDLE_AHEAD)sections[i]._unmount();
 }
-for(let i=start;i<=end;i++)sections[i]._mount();
-const idle=window.requestIdleCallback||((fn)=>setTimeout(fn,350));
+sections[center]?._mount();
+if(center+1<=end)sections[center+1]._mount();
+if(center-1>=start)sections[center-1]._mount();
+const queue=[];
+for(let i=center+2;i<=end;i++)queue.push(i);
+for(let i=center-2;i>=start;i--)queue.push(i);
+queue.forEach((i,k)=>setTimeout(()=>{
+if(epoch===preloadEpoch&&document.visibilityState==='visible')sections[i]._mount();
+},(k+1)*(isMobile?150:90)));
+const idle=window.requestIdleCallback||((fn)=>setTimeout(fn,300));
 if(IDLE_AHEAD) idle(()=>{
-if(document.visibilityState!=='visible')return;
+if(epoch!==preloadEpoch||document.visibilityState!=='visible')return;
 for(let i=end+1;i<=Math.min(slides.length-1,end+IDLE_AHEAD);i++)sections[i]._mount();
-},{timeout:1000});
+},{timeout:900});
 }
 
 const predictive=new IntersectionObserver(entries=>{
 for(const e of entries){
 if(!e.isIntersecting)continue;
 const i=Number(e.target.dataset.index);
-for(let n=Math.max(0,i-1);n<=Math.min(slides.length-1,i+KEEP_AHEAD);n++)sections[n]._mount();
+sections[i]?._mount();
+if(i+1<slides.length)sections[i+1]._mount();
 }
-},{root:scroller,rootMargin:'180% 0px 260% 0px',threshold:.01});
+},{root:scroller,rootMargin:'120% 0px 220% 0px',threshold:.01});
 
 const active=new IntersectionObserver(entries=>{
 for(const e of entries){
@@ -262,10 +271,16 @@ doc.addEventListener('fullscreenchange',syncFs);
 doc.addEventListener('webkitfullscreenchange',syncFs);
 }
 
-getProjects().then(render).catch(()=>{
+const cached=cachedProjects();
+if(cached.length){
+render(cached);
+fetchFreshProjects().catch(()=>{});
+}else{
+fetchFreshProjects().then(render).catch(()=>{
 app.innerHTML='<div class="status retry">PORTFOLIO TEMPORARILY UNAVAILABLE<br><br>TAP TO RETRY</div>';
 app.firstElementChild.addEventListener('click',()=>location.reload());
 });
+}
 })();
 </script>
 </body>

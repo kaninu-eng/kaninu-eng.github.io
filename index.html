@@ -32,7 +32,7 @@ body{font-family:Arial,Helvetica,sans-serif}
 .fullscreen-button:hover,.fullscreen-button:focus-visible{color:#fff;background:rgba(0,0,0,.36);outline:none}
 .status{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;color:#777;font-size:11px;letter-spacing:.14em;z-index:10;text-align:center;padding:24px}
 .status.retry{cursor:pointer}
-@media(max-width:700px){.viewer,.portfolio-scroll,.portfolio-page{height:100svh;min-height:100svh}.portfolio-scroll{scroll-behavior:auto;touch-action:pan-y}.portfolio-page{content-visibility:visible;contain:layout paint style}.slide-stage{max-height:100svh;width:min(100vw,calc(100svh * 2.41351))}.counter{right:12px;bottom:max(12px,env(safe-area-inset-bottom))}.fullscreen-button{bottom:max(10px,env(safe-area-inset-bottom));width:52px;height:52px;font-size:28px;line-height:52px}}
+@media(max-width:900px){.viewer,.portfolio-scroll,.portfolio-page{height:100vh;min-height:100vh;height:100svh;min-height:100svh}.portfolio-scroll{scroll-behavior:auto;touch-action:pan-y}.portfolio-page{content-visibility:visible;contain:layout paint style}.slide-stage{max-height:100svh;width:min(100vw,calc(100svh * 2.41351))}.counter{right:12px;bottom:max(12px,env(safe-area-inset-bottom))}.fullscreen-button{bottom:max(10px,env(safe-area-inset-bottom));width:52px;height:52px;font-size:28px;line-height:52px}}
 @media(prefers-reduced-motion:reduce){.portfolio-scroll{scroll-behavior:auto}}
 </style>
 </head>
@@ -50,10 +50,10 @@ const VIDEO_SLIDES=new Set([
 '1QRraD6xGY3ED4U-hVZOSh6QHXjOh4zle8fO1zhSKfvo:g3fb9b795649_0_115'
 ]);
 const app=document.getElementById('app');
-const isMobile=matchMedia('(max-width:700px)').matches;
+const isMobile=matchMedia('(max-width:900px)').matches || (navigator.maxTouchPoints>0 && matchMedia('(pointer:coarse)').matches);
 const memoryGB=Number(navigator.deviceMemory||0);
 const lowMemory=memoryGB>0&&memoryGB<=4;
-const KEEP_BEHIND=isMobile?1:1;
+const KEEP_BEHIND=1;
 const KEEP_AHEAD=isMobile?1:(lowMemory?3:5);
 const IDLE_AHEAD=isMobile?0:(lowMemory?1:2);
 const MOBILE_LOAD_DELAY=450;
@@ -271,6 +271,12 @@ document.addEventListener('visibilitychange',()=>{
 if(document.visibilityState==='visible')mountWindow(current);
 });
 window.addEventListener('pageshow',()=>{mountWindow(current);});
+window.addEventListener('pagehide',()=>{
+try{
+const s=slides[current];
+if(s)sessionStorage.setItem(PROGRESS_KEY,JSON.stringify({key:s.project.presentationId+':'+s.slideId,index:current,ts:Date.now()}));
+}catch(_){}
+});
 
 const root=document.documentElement;
 const doc=document;

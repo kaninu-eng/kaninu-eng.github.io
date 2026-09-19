@@ -271,10 +271,17 @@ doc.addEventListener('fullscreenchange',syncFs);
 doc.addEventListener('webkitfullscreenchange',syncFs);
 }
 
+const projectSignature=projects=>JSON.stringify(projects.map(p=>[p.name,p.presentationId,p.slideIds]));
 const cached=cachedProjects();
 if(cached.length){
 render(cached);
-fetchFreshProjects().catch(()=>{});
+fetchFreshProjects().then(fresh=>{
+const freshSig=projectSignature(fresh);
+if(freshSig!==projectSignature(cached)&&sessionStorage.getItem('archivePortfolioFreshSig')!==freshSig){
+sessionStorage.setItem('archivePortfolioFreshSig',freshSig);
+location.reload();
+}
+}).catch(()=>{});
 }else{
 fetchFreshProjects().then(render).catch(()=>{
 app.innerHTML='<div class="status retry">PORTFOLIO TEMPORARILY UNAVAILABLE<br><br>TAP TO RETRY</div>';

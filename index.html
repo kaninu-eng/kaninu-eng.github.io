@@ -32,7 +32,7 @@ body{font-family:Arial,Helvetica,sans-serif}
 .fullscreen-button:hover,.fullscreen-button:focus-visible{color:#fff;background:rgba(0,0,0,.36);outline:none}
 .status{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;color:#777;font-size:11px;letter-spacing:.14em;z-index:10;text-align:center;padding:24px}
 .status.retry{cursor:pointer}
-@media(max-width:600px){.counter{right:12px;bottom:max(12px,env(safe-area-inset-bottom))}.fullscreen-button{bottom:max(10px,env(safe-area-inset-bottom));width:52px;height:52px;font-size:28px;line-height:52px}}
+@media(max-width:700px){.viewer,.portfolio-scroll,.portfolio-page{height:100svh;min-height:100svh}.portfolio-scroll{scroll-behavior:auto;touch-action:pan-y}.portfolio-page{content-visibility:visible;contain:layout paint style}.slide-stage{max-height:100svh;width:min(100vw,calc(100svh * 2.41351))}.counter{right:12px;bottom:max(12px,env(safe-area-inset-bottom))}.fullscreen-button{bottom:max(10px,env(safe-area-inset-bottom));width:52px;height:52px;font-size:28px;line-height:52px}}
 @media(prefers-reduced-motion:reduce){.portfolio-scroll{scroll-behavior:auto}}
 </style>
 </head>
@@ -53,9 +53,11 @@ const app=document.getElementById('app');
 const isMobile=matchMedia('(max-width:700px)').matches;
 const memoryGB=Number(navigator.deviceMemory||0);
 const lowMemory=memoryGB>0&&memoryGB<=4;
-const KEEP_BEHIND=1;
-const KEEP_AHEAD=isMobile?(lowMemory?2:3):(lowMemory?3:5);
-const IDLE_AHEAD=isMobile?(lowMemory?0:1):(lowMemory?1:2);
+const KEEP_BEHIND=isMobile?1:1;
+const KEEP_AHEAD=isMobile?1:(lowMemory?3:5);
+const IDLE_AHEAD=isMobile?0:(lowMemory?1:2);
+const MOBILE_LOAD_DELAY=450;
+const PROGRESS_KEY='archivePortfolioSessionProgress';
 app.innerHTML='<div class="status">LOADING PORTFOLIO</div>';
 
 const normalize=projects=>(projects||[]).flatMap(p=>{
@@ -94,6 +96,7 @@ function updateCounter(i){
 current=Math.max(0,Math.min(slides.length-1,i));
 const s=slides[current];
 counter.textContent=s.project.name+' · '+(s.localIndex+1)+' / '+s.project.slideIds.length;
+try{sessionStorage.setItem(PROGRESS_KEY,JSON.stringify({key:s.project.presentationId+':'+s.slideId,index:current,ts:Date.now()}));}catch(_){}
 }
 
 function makeLoading(text='LOADING',retry=false){
@@ -113,7 +116,7 @@ section.setAttribute('aria-label',item.project.name+' slide '+(item.localIndex+1
 const stage=document.createElement('div');
 stage.className='slide-stage';
 const customRatio=PRESENTATION_RATIOS.get(item.project.presentationId);
-if(customRatio){stage.style.aspectRatio=String(customRatio);stage.style.width='min(100vw,calc(100dvh * '+customRatio+'))';}
+if(customRatio){stage.style.aspectRatio=String(customRatio);stage.style.width='min(100vw,calc('+(isMobile?'100svh':'100dvh')+' * '+customRatio+'))';}
 stage.appendChild(makeLoading());
 section.appendChild(stage);
 section._generation=0;
@@ -179,7 +182,7 @@ section._mount(0);
 },{once:true});
 stage.replaceChildren(retry);
 }
-},15000);
+},isMobile?10000:15000);
 };
 return section;
 }
@@ -199,6 +202,13 @@ for(const i of [...mounted]){
 if(i<start||i>end+IDLE_AHEAD)sections[i]._unmount();
 }
 sections[center]?._mount();
+if(isMobile){
+if(center-1>=start)sections[center-1]._mount();
+if(center+1<=end)setTimeout(()=>{
+if(epoch===preloadEpoch&&document.visibilityState==='visible')sections[center+1]._mount();
+},MOBILE_LOAD_DELAY);
+return;
+}
 if(center+1<=end)sections[center+1]._mount();
 if(center-1>=start)sections[center-1]._mount();
 const queue=[];
@@ -206,7 +216,7 @@ for(let i=center+2;i<=end;i++)queue.push(i);
 for(let i=center-2;i>=start;i--)queue.push(i);
 queue.forEach((i,k)=>setTimeout(()=>{
 if(epoch===preloadEpoch&&document.visibilityState==='visible')sections[i]._mount();
-},(k+1)*(isMobile?150:90)));
+},(k+1)*90));
 const idle=window.requestIdleCallback||((fn)=>setTimeout(fn,300));
 if(IDLE_AHEAD) idle(()=>{
 if(epoch!==preloadEpoch||document.visibilityState!=='visible')return;
@@ -232,9 +242,18 @@ mountWindow(i);
 }
 }
 },{root:scroller,threshold:[.58]});
-sections.forEach(s=>{predictive.observe(s);active.observe(s)});
-updateCounter(0);
-mountWindow(0);
+sections.forEach(s=>{if(!isMobile)predictive.observe(s);active.observe(s)});
+let initialIndex=0;
+try{
+const saved=JSON.parse(sessionStorage.getItem(PROGRESS_KEY)||'null');
+if(saved&&Date.now()-Number(saved.ts||0)<6*60*60*1000){
+const byKey=slides.findIndex(s=>s.project.presentationId+':'+s.slideId===saved.key);
+initialIndex=byKey>=0?byKey:Math.max(0,Math.min(slides.length-1,Number(saved.index||0)));
+}
+}catch(_){}
+updateCounter(initialIndex);
+mountWindow(initialIndex);
+if(initialIndex>0)requestAnimationFrame(()=>{scroller.scrollTop=initialIndex*scroller.clientHeight;});
 
 function go(i){
 const n=Math.max(0,Math.min(slides.length-1,i));
@@ -251,6 +270,7 @@ else if(e.key==='End'){e.preventDefault();go(slides.length-1)}
 document.addEventListener('visibilitychange',()=>{
 if(document.visibilityState==='visible')mountWindow(current);
 });
+window.addEventListener('pageshow',()=>{mountWindow(current);});
 
 const root=document.documentElement;
 const doc=document;
@@ -278,13 +298,7 @@ const projectSignature=projects=>JSON.stringify(projects.map(p=>[p.name,p.presen
 const cached=cachedProjects();
 if(cached.length){
 render(cached);
-fetchFreshProjects().then(fresh=>{
-const freshSig=projectSignature(fresh);
-if(freshSig!==projectSignature(cached)&&sessionStorage.getItem('archivePortfolioFreshSig')!==freshSig){
-sessionStorage.setItem('archivePortfolioFreshSig',freshSig);
-location.reload();
-}
-}).catch(()=>{});
+fetchFreshProjects().catch(()=>{});
 }else{
 fetchFreshProjects().then(render).catch(()=>{
 app.innerHTML='<div class="status retry">PORTFOLIO TEMPORARILY UNAVAILABLE<br><br>TAP TO RETRY</div>';

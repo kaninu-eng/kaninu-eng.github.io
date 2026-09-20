@@ -39,11 +39,38 @@ jobs:
             '1QRraD6xGY3ED4U-hVZOSh6QHXjOh4zle8fO1zhSKfvo:g3fb9b795649_0_115',
           }
 
-          req=urllib.request.Request(CONTROL_URL+'?sync='+str(int(time.time())),headers={'User-Agent':'ARCHIVE-Portfolio-Sync/1.0'})
-          with urllib.request.urlopen(req,timeout=45) as r:
-            data=json.load(r)
-          if not data.get('ok') or not data.get('projects'):
-            raise RuntimeError('Control feed unavailable or empty')
+          manifest_path=pathlib.Path('assets/slide-manifest.json')
+          previous={}
+          if manifest_path.exists():
+            try:
+              previous=json.loads(manifest_path.read_text(encoding='utf-8'))
+            except Exception:
+              previous={}
+
+          data=None
+          last_feed_error=None
+          for attempt in range(4):
+            try:
+              req=urllib.request.Request(
+                CONTROL_URL+'?sync='+str(int(time.time()))+'&attempt='+str(attempt),
+                headers={'User-Agent':'ARCHIVE-Portfolio-Sync/1.0'}
+              )
+              with urllib.request.urlopen(req,timeout=25) as r:
+                candidate=json.load(r)
+              if candidate.get('ok') and candidate.get('projects'):
+                data=candidate
+                break
+              raise RuntimeError('Control feed empty')
+            except Exception as e:
+              last_feed_error=e
+              time.sleep(2*(attempt+1))
+
+          if data is None:
+            if previous.get('projects'):
+              print('Control feed unavailable; using previous local manifest:',last_feed_error)
+              data={'ok':True,'projects':previous['projects']}
+            else:
+              raise RuntimeError('Control feed unavailable and no local manifest fallback: '+str(last_feed_error))
 
           projects=[]
           jobs=[]
@@ -112,13 +139,6 @@ jobs:
                   digest.update(chunk)
           asset_version=digest.hexdigest()[:16]
 
-          manifest_path=pathlib.Path('assets/slide-manifest.json')
-          previous={}
-          if manifest_path.exists():
-            try:
-              previous=json.loads(manifest_path.read_text(encoding='utf-8'))
-            except Exception:
-              previous={}
           generated_at=previous.get('generatedAt') if previous.get('assetVersion')==asset_version else int(time.time()*1000)
 
           manifest={

@@ -80,10 +80,15 @@ const KEEP_BEHIND=isMobile?2:1;
 const KEEP_AHEAD=isMobile?3:(lowMemory?3:5);
 const IDLE_AHEAD=isMobile?0:(lowMemory?1:2);
 const MOBILE_LOAD_DELAY=90;
-const MOBILE_PREFETCH_AHEAD=10;
+const MOBILE_PREFETCH_AHEAD=5;
+const MOBILE_DEEP_PREFETCH_START=6;
+const MOBILE_DEEP_PREFETCH_END=30;
 const MOBILE_CACHE_BEHIND=3;
 const PROGRESS_KEY='archivePortfolioProgress';
 app.innerHTML='<div class="status">LOADING PORTFOLIO</div>';
+if('serviceWorker' in navigator){
+navigator.serviceWorker.register('/sw.js').then(()=>navigator.serviceWorker.ready).catch(()=>{});
+}
 
 const normalize=projects=>(projects||[]).flatMap(p=>{
 if(!p||!p.name||!p.presentationId||!Array.isArray(p.slideIds))return[];
@@ -178,6 +183,19 @@ for(let i=Math.max(0,center-MOBILE_CACHE_BEHIND);i<center;i++){
 prepareMobileImage(slides[i],i,'low');
 }
 trimMobileImageCache(center);
+}
+function deepPrefetchMobile(center,epoch){
+if(!isMobile||!navigator.serviceWorker?.controller)return;
+setTimeout(()=>{
+if(epoch!==preloadEpoch||document.visibilityState!=='visible')return;
+const urls=[];
+for(let i=center+MOBILE_DEEP_PREFETCH_START;i<=Math.min(slides.length-1,center+MOBILE_DEEP_PREFETCH_END);i++){
+const item=slides[i];
+if(VIDEO_SLIDES.has(item.project.presentationId+':'+item.slideId))continue;
+urls.push(slideImageUrl(item,'jpeg'));
+}
+if(urls.length)navigator.serviceWorker.controller.postMessage({type:'PREFETCH_SLIDES',urls});
+},1200);
 }
 
 function updateCounter(i){
@@ -325,6 +343,7 @@ for(let i=center+2;i<=end;i++)setTimeout(()=>{
 if(epoch===preloadEpoch&&document.visibilityState==='visible')sections[i]._mount();
 },(i-center-1)*MOBILE_LOAD_DELAY);
 warmMobileImages(center,epoch);
+deepPrefetchMobile(center,epoch);
 return;
 }
 if(center+1<=end)sections[center+1]._mount();

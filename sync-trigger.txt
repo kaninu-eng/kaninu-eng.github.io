@@ -1,1 +1,1 @@
-Initial static slide sync trigger — 2026-09-20
+Performance architecture sync — 2026-09-20 v2

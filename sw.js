@@ -1,5 +1,5 @@
-const CACHE='archive-slide-cache-v1';
-const MAX_ENTRIES=140;
+const CACHE='archive-slide-cache-v2';
+const MAX_ENTRIES=320;
 
 self.addEventListener('install',()=>self.skipWaiting());
 self.addEventListener('activate',event=>{
@@ -14,8 +14,9 @@ function isSlideImage(request){
   if(request.method!=='GET')return false;
   try{
     const u=new URL(request.url);
-    return u.hostname==='docs.google.com' &&
-      /\/presentation\/d\/[^/]+\/export\/(jpeg|png)$/.test(u.pathname);
+    const local=u.origin===self.location.origin && u.pathname.startsWith('/assets/slides/') && u.pathname.endsWith('.jpg');
+    const google=u.hostname==='docs.google.com' && /\/presentation\/d\/[^/]+\/export\/(jpeg|png)$/.test(u.pathname);
+    return local||google;
   }catch(_){return false}
 }
 
@@ -55,7 +56,10 @@ async function prefetchUrls(urls){
   async function worker(){
     while(cursor<queue.length){
       const url=queue[cursor++];
-      const req=new Request(url,{mode:'no-cors',credentials:'omit'});
+      const u=new URL(url,self.location.origin);
+      const req=u.origin===self.location.origin
+        ? new Request(u.href,{credentials:'same-origin'})
+        : new Request(u.href,{mode:'no-cors',credentials:'omit'});
       const hit=await cache.match(req);
       if(hit)continue;
       try{

@@ -17,7 +17,7 @@ body{font-family:Arial,Helvetica,sans-serif}
 .portfolio-scroll{width:100%;height:100%;overflow-x:hidden;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior-y:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
 .portfolio-scroll::-webkit-scrollbar{display:none}
 .portfolio-page{width:100%;height:100dvh;min-height:100dvh;display:flex;align-items:center;justify-content:center;scroll-snap-align:start;scroll-snap-stop:normal;background:#000;contain:layout paint style;content-visibility:auto;contain-intrinsic-size:auto 100dvh}
-.slide-stage{width:min(100vw,calc(100dvh * 2.41351));aspect-ratio:28575000/11839575;max-height:100dvh;position:relative;overflow:hidden;background:#fff}
+.slide-stage{--slide-ratio:2.41351;width:min(100vw,calc(100dvh * var(--slide-ratio)));aspect-ratio:var(--slide-ratio);max-height:100dvh;position:relative;overflow:hidden;background:#fff}
 .loading-label{position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;background:#fff;color:#aaa;font-size:10px;letter-spacing:.18em;pointer-events:none}
 .loading-label.retry{pointer-events:auto;cursor:pointer}
 .slide-frame{position:absolute;inset:-2px;width:calc(100% + 4px);height:calc(100% + 4px);border:0;background:#000;opacity:0;pointer-events:none}
@@ -48,7 +48,7 @@ body{font-family:Arial,Helvetica,sans-serif}
 .slide-stage{max-height:none;width:100vw}
 .viewer.is-fullscreen .portfolio-scroll{scroll-snap-type:y mandatory;padding-bottom:0}
 .viewer.is-fullscreen .portfolio-page{height:100vh;min-height:100vh;height:100svh;min-height:100svh;scroll-snap-align:start;padding:0}
-.viewer.is-fullscreen .slide-stage{width:min(100vw,calc(100svh * 2.41351));max-height:100svh}
+.viewer.is-fullscreen .slide-stage{width:min(100vw,calc(100svh * var(--slide-ratio)));max-height:100svh}
 .scrubber{width:calc(100vw - 24px);bottom:max(6px,env(safe-area-inset-bottom));padding:5px 10px 6px}
 .scrubber-label{font-size:9px}
 .counter{right:12px}
@@ -146,7 +146,7 @@ section.setAttribute('aria-label',item.project.name+' slide '+(item.localIndex+1
 const stage=document.createElement('div');
 stage.className='slide-stage';
 const customRatio=PRESENTATION_RATIOS.get(item.project.presentationId);
-if(customRatio){stage.style.aspectRatio=String(customRatio);if(!isMobile)stage.style.width='min(100vw,calc(100dvh * '+customRatio+'))';}
+if(customRatio)stage.style.setProperty('--slide-ratio',String(customRatio));
 stage.appendChild(makeLoading());
 section.appendChild(stage);
 section._generation=0;

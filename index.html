@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://docs.google.com" crossorigin>
 <link rel="preconnect" href="https://script.google.com" crossorigin>
@@ -23,16 +23,11 @@ body{font-family:Arial,Helvetica,sans-serif}
 .slide-frame{position:absolute;inset:-2px;width:calc(100% + 4px);height:calc(100% + 4px);border:0;background:#000;opacity:0;pointer-events:none}
 .slide-image{position:absolute;inset:-1px;width:calc(100% + 2px);height:calc(100% + 2px);object-fit:fill;display:block;background:#000;opacity:0}
 .slide-image.is-ready{opacity:1}
-@media(max-width:900px){
-.slide-stage.zoomable{touch-action:pan-y}
-.slide-stage.zoomable.is-zoomed{touch-action:none}
-.slide-stage.zoomable .slide-image{transform-origin:0 0;will-change:transform}
-}
 .slide-frame.is-ready{opacity:1}
 .slide-frame.is-video{pointer-events:auto}
-.scroll-shield{position:absolute;inset:0;z-index:2;background:transparent;touch-action:pan-y}
+.scroll-shield{position:absolute;inset:0;z-index:2;background:transparent;touch-action:pan-y pinch-zoom}
 .video-scroll-edges{position:absolute;inset:0;z-index:2;pointer-events:none}
-.video-edge{position:absolute;pointer-events:auto;background:transparent;touch-action:pan-y;top:8%;bottom:18%;width:7%}
+.video-edge{position:absolute;pointer-events:auto;background:transparent;touch-action:pan-y pinch-zoom;top:8%;bottom:18%;width:7%}
 .video-edge-left{left:0}.video-edge-right{right:0}
 .counter{position:fixed;right:16px;bottom:max(14px,env(safe-area-inset-bottom));z-index:5;font-size:10px;letter-spacing:.08em;color:rgba(190,190,190,.72);pointer-events:none}
 .fullscreen-button{position:fixed;left:50%;bottom:max(12px,env(safe-area-inset-bottom));z-index:6;width:48px;height:48px;transform:translateX(-50%);border:0;border-radius:4px;padding:0;background:rgba(0,0,0,.22);color:rgba(220,220,220,.72);font:26px/48px Arial,Helvetica,sans-serif;text-align:center;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
@@ -48,7 +43,7 @@ body{font-family:Arial,Helvetica,sans-serif}
 .viewer:not(.is-fullscreen) .counter{bottom:max(54px,calc(env(safe-area-inset-bottom) + 54px))}
 @media(max-width:900px){
 .viewer,.portfolio-scroll{height:100vh;height:100svh}
-.portfolio-scroll{scroll-behavior:auto;touch-action:pan-y;scroll-snap-type:none;padding-bottom:58px}
+.portfolio-scroll{scroll-behavior:auto;touch-action:pan-y pinch-zoom;scroll-snap-type:none;padding-bottom:58px}
 .portfolio-page{height:auto;min-height:0;content-visibility:visible;contain:layout paint style;scroll-snap-align:none;padding:1px 0}
 .slide-stage{max-height:none;width:100vw}
 .viewer.is-fullscreen .portfolio-scroll{scroll-snap-type:y mandatory;padding-bottom:0}
@@ -227,115 +222,6 @@ d.textContent=text;
 return d;
 }
 
-function enableSlideZoom(stage,section){
-if(!isMobile)return;
-stage.classList.add('zoomable');
-let scale=1,x=0,y=0;
-let pinch=null,pan=null;
-let lastTap=0;
-
-const img=()=>stage.querySelector('img.slide-image');
-const clamp=()=>{
-const w=stage.clientWidth||1,h=stage.clientHeight||1;
-const minX=Math.min(0,w-w*scale),minY=Math.min(0,h-h*scale);
-x=Math.max(minX,Math.min(0,x));
-y=Math.max(minY,Math.min(0,y));
-};
-const apply=()=>{
-const el=img(); if(!el)return;
-if(scale<1.001){scale=1;x=0;y=0}
-clamp();
-el.style.transform='matrix('+scale+',0,0,'+scale+','+x+','+y+')';
-stage.classList.toggle('is-zoomed',scale>1.01);
-};
-const reset=()=>{
-scale=1;x=0;y=0;pinch=null;pan=null;apply();
-};
-const point=(t)=>{
-const r=stage.getBoundingClientRect();
-return {x:t.clientX-r.left,y:t.clientY-r.top};
-};
-const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-const midpoint=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
-
-stage.addEventListener('touchstart',e=>{
-if(!img())return;
-if(e.touches.length===2){
-const a=point(e.touches[0]),b=point(e.touches[1]);
-const mid=midpoint(a,b);
-pinch={
-distance:Math.max(1,distance(a,b)),
-scale,
-contentX:(mid.x-x)/scale,
-contentY:(mid.y-y)/scale
-};
-pan=null;
-e.preventDefault();
-}else if(e.touches.length===1&&scale>1.01){
-const p=point(e.touches[0]);
-pan={px:p.x,py:p.y,x,y};
-}
-},{passive:false});
-
-stage.addEventListener('touchmove',e=>{
-if(!img())return;
-if(e.touches.length===2&&pinch){
-const a=point(e.touches[0]),b=point(e.touches[1]);
-const mid=midpoint(a,b);
-const next=Math.max(1,Math.min(4,pinch.scale*(distance(a,b)/pinch.distance)));
-scale=next;
-x=mid.x-pinch.contentX*scale;
-y=mid.y-pinch.contentY*scale;
-apply();
-e.preventDefault();
-}else if(e.touches.length===1&&scale>1.01){
-const p=point(e.touches[0]);
-if(!pan)pan={px:p.x,py:p.y,x,y};
-x=pan.x+(p.x-pan.px);
-y=pan.y+(p.y-pan.py);
-apply();
-e.preventDefault();
-}
-},{passive:false});
-
-stage.addEventListener('touchend',e=>{
-if(e.touches.length<2)pinch=null;
-if(e.touches.length===0)pan=null;
-if(scale<1.05)reset();
-},{passive:true});
-
-stage.addEventListener('dblclick',e=>{
-if(!img())return;
-const r=stage.getBoundingClientRect();
-const mx=e.clientX-r.left,my=e.clientY-r.top;
-if(scale>1.01){reset();return}
-scale=2;
-x=mx-mx*scale;
-y=my-my*scale;
-apply();
-});
-
-stage.addEventListener('touchend',e=>{
-if(e.changedTouches.length!==1||e.touches.length)return;
-const now=Date.now();
-if(now-lastTap<280){
-const t=e.changedTouches[0];
-const r=stage.getBoundingClientRect();
-const mx=t.clientX-r.left,my=t.clientY-r.top;
-if(scale>1.01)reset();
-else{
-scale=2;
-x=mx-mx*scale;
-y=my-my*scale;
-apply();
-}
-lastTap=0;
-}else lastTap=now;
-},{passive:true});
-
-section._resetZoom=reset;
-}
-
 function makeSlide(item,index){
 const key=item.project.presentationId+':'+item.slideId;
 const isVideo=VIDEO_SLIDES.has(key);
@@ -347,14 +233,12 @@ const stage=document.createElement('div');
 stage.className='slide-stage';
 const customRatio=PRESENTATION_RATIOS.get(item.project.presentationId);
 if(customRatio)stage.style.setProperty('--slide-ratio',String(customRatio));
-if(isMobile&&!isVideo)enableSlideZoom(stage,section);
 stage.appendChild(makeLoading());
 section.appendChild(stage);
 section._generation=0;
 section._timer=null;
 
 section._unmount=()=>{
-section._resetZoom?.();
 section._generation++;
 if(section._timer)clearTimeout(section._timer);
 section._timer=null;
@@ -575,7 +459,6 @@ else if(root.webkitRequestFullscreen)await root.webkitRequestFullscreen();
 function syncFs(){
 const on=!!(doc.fullscreenElement||doc.webkitFullscreenElement);
 viewer.classList.toggle('is-fullscreen',on);
-sections[current]?._resetZoom?.();
 requestAnimationFrame(()=>{scroller.scrollTop=sections[current]?.offsetTop||0;mountWindow(current)});
 fs.textContent=on?'×':'⛶';
 fs.setAttribute('aria-label',on?'Exit fullscreen':'Enter fullscreen');

@@ -1,0 +1,125 @@
+name: Sync portfolio slide images
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+  push:
+    paths:
+      - 'sync-trigger.txt'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: portfolio-slide-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Render Google Slides to static JPEG cache
+        env:
+          CONTROL_URL: https://script.google.com/macros/s/AKfycbyIlZriI8wvw-VWHWkUva8TSCvmYn04JCAyoGbnRqNWpIvRMjS7BmApbIGm_0spKqkMAw/exec
+        run: |
+          python3 - <<'PY'
+          import concurrent.futures, json, os, pathlib, time, urllib.parse, urllib.request
+
+          CONTROL_URL=os.environ['CONTROL_URL']
+          VIDEO={
+            '1ZdriVfkQNIfcbwqQ9zNGcxKRHwC4YhKI_zsSa5ewxgc:g3b773260940_0_54',
+            '1xml51vsR09JDbgRwIyvT1Gf8Cfj9v-P9RdGGWJKWG_A:g3b1f4e5e68d_0_3',
+            '154LAAGv-ZC_tndMA8ZZsOid7MXX75is3U0dn1Wnux0o:g3fb98553a14_0_0',
+            '1QRraD6xGY3ED4U-hVZOSh6QHXjOh4zle8fO1zhSKfvo:g3fb9b795649_0_115',
+          }
+
+          req=urllib.request.Request(CONTROL_URL+'?sync='+str(int(time.time())),headers={'User-Agent':'ARCHIVE-Portfolio-Sync/1.0'})
+          with urllib.request.urlopen(req,timeout=45) as r:
+            data=json.load(r)
+          if not data.get('ok') or not data.get('projects'):
+            raise RuntimeError('Control feed unavailable or empty')
+
+          projects=[]
+          jobs=[]
+          for p in data['projects']:
+            pid=p.get('presentationId')
+            name=p.get('name')
+            ids=[x for x in (p.get('slideIds') or []) if x]
+            if not pid or not name or not ids:
+              continue
+            projects.append({'name':name,'presentationId':pid,'slideIds':ids})
+            for sid in ids:
+              if f'{pid}:{sid}' not in VIDEO:
+                jobs.append((pid,sid))
+
+          root=pathlib.Path('assets/slides')
+          root.mkdir(parents=True,exist_ok=True)
+
+          def download(job):
+            pid,sid=job
+            folder=root/pid
+            folder.mkdir(parents=True,exist_ok=True)
+            target=folder/(sid+'.jpg')
+            url='https://docs.google.com/presentation/d/'+urllib.parse.quote(pid,safe='')+'/export/jpeg?pageid='+urllib.parse.quote(sid,safe='')
+            last=None
+            for attempt in range(4):
+              try:
+                req=urllib.request.Request(url,headers={
+                  'User-Agent':'Mozilla/5.0 ARCHIVE-Portfolio-Sync',
+                  'Accept':'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+                })
+                with urllib.request.urlopen(req,timeout=55) as r:
+                  body=r.read()
+                if len(body)<1500 or body[:2]!=b'\xff\xd8':
+                  raise RuntimeError('Unexpected JPEG response '+str(len(body)))
+                tmp=target.with_suffix('.jpg.tmp')
+                tmp.write_bytes(body)
+                tmp.replace(target)
+                return {'ok':True,'pid':pid,'sid':sid,'bytes':len(body)}
+              except Exception as e:
+                last=e
+                time.sleep(1.5*(attempt+1))
+            return {'ok':False,'pid':pid,'sid':sid,'error':str(last)}
+
+          failures=[]
+          total_bytes=0
+          with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+            for n,res in enumerate(ex.map(download,jobs),1):
+              if res['ok']:
+                total_bytes+=res['bytes']
+              else:
+                failures.append(res)
+              if n%50==0:
+                print(f'{n}/{len(jobs)} rendered; failures={len(failures)}')
+
+          manifest={
+            'ok': True,
+            'generatedAt': int(time.time()*1000),
+            'projects': projects,
+            'videos': sorted(VIDEO),
+            'rendered': len(jobs)-len(failures),
+            'failed': failures,
+          }
+          pathlib.Path('assets/slide-manifest.json').write_text(json.dumps(manifest,separators=(',',':')),encoding='utf-8')
+          print(f'Finished: {manifest["rendered"]}/{len(jobs)} JPEGs, {total_bytes/1024/1024:.1f} MB downloaded')
+          if failures:
+            print('Failures:',json.dumps(failures[:30],indent=2))
+          PY
+
+      - name: Commit refreshed static slide cache
+        run: |
+          git config user.name "ARCHIVE Portfolio Sync"
+          git config user.email "actions@users.noreply.github.com"
+          git add assets/slides assets/slide-manifest.json
+          if git diff --cached --quiet; then
+            echo "No slide changes."
+          else
+            git commit -m "Sync static portfolio slide images"
+            git push
+          fi

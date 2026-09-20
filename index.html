@@ -4,10 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
-<link rel="preconnect" href="https://docs.google.com" crossorigin>
-<link rel="preconnect" href="https://script.google.com" crossorigin>
-<link rel="preconnect" href="https://lh3.googleusercontent.com" crossorigin>
-<link rel="dns-prefetch" href="//googleusercontent.com">
+<link rel="icon" href="data:,">
+<meta name="description" content="ARCHIVE STUDIO — selected architecture and design portfolio.">
 <title>ARCHIVE Portfolio</title>
 <style>
 html,body,#app{width:100%;height:100%;margin:0;overflow:hidden;background:#000}
@@ -80,11 +78,6 @@ const lowMemory=memoryGB>0&&memoryGB<=4;
 const KEEP_BEHIND=isMobile?2:1;
 const KEEP_AHEAD=isMobile?3:(lowMemory?3:5);
 const IDLE_AHEAD=isMobile?0:(lowMemory?1:2);
-const MOBILE_LOAD_DELAY=90;
-const MOBILE_PREFETCH_AHEAD=5;
-const MOBILE_DEEP_PREFETCH_START=6;
-const MOBILE_DEEP_PREFETCH_END=30;
-const MOBILE_CACHE_BEHIND=3;
 const PROGRESS_KEY='archivePortfolioProgress';
 app.innerHTML='<div class="status">LOADING PORTFOLIO</div>';
 if('serviceWorker' in navigator){
@@ -97,20 +90,38 @@ const slideIds=p.slideIds.filter(id=>id&&!MENU_SLIDE_IDS.has(id));
 return slideIds.length?[{name:p.name,presentationId:p.presentationId,slideIds}]:[];
 });
 
+let assetVersion='1';
 function cachedProjects(){
 try{
 const raw=JSON.parse(localStorage.getItem('archivePortfolioFeed')||'[]');
+if(raw&&raw.assetVersion)assetVersion=String(raw.assetVersion);
 return normalize(Array.isArray(raw)?raw:(raw.projects||[]));
 }catch(_){return[]}
 }
-async function fetchFreshProjects(){
-const r=await fetch(CONTROL_URL+'?t='+Date.now(),{cache:'no-store'});
+async function loadFeed(url,opts){
+const r=await fetch(url,opts);
 if(!r.ok)throw new Error('feed');
 const data=await r.json();
 const projects=normalize(data.projects);
 if(!data.ok||!projects.length)throw new Error('feed');
-localStorage.setItem('archivePortfolioFeed',JSON.stringify({projects,savedAt:Date.now()}));
-return projects;
+if(data.assetVersion)assetVersion=String(data.assetVersion);
+return {projects,assetVersion};
+}
+async function fetchFreshProjects(){
+let result;
+try{
+result=await loadFeed('/assets/slide-manifest.json',{cache:'no-cache'});
+}catch(_){
+result=await loadFeed(CONTROL_URL+'?t='+Date.now(),{cache:'no-store'});
+}
+try{
+localStorage.setItem('archivePortfolioFeed',JSON.stringify({
+projects:result.projects,
+assetVersion:result.assetVersion||assetVersion,
+savedAt:Date.now()
+}));
+}catch(_){}
+return result.projects;
 }
 
 function render(projects){
@@ -130,7 +141,7 @@ let current=0;
 const mobileImageCache=new Map();
 
 function slideImageUrl(item){
-return '/assets/slides/'+encodeURIComponent(item.project.presentationId)+'/'+encodeURIComponent(item.slideId)+'.jpg';
+return '/assets/slides/'+encodeURIComponent(item.project.presentationId)+'/'+encodeURIComponent(item.slideId)+'.jpg?v='+encodeURIComponent(assetVersion);
 }
 function googleSlideImageUrl(item,format='jpeg'){
 return 'https://docs.google.com/presentation/d/'+item.project.presentationId+'/export/'+format+'?id='+item.project.presentationId+'&pageid='+item.slideId;
@@ -149,6 +160,7 @@ rec={img,state:'loading',source:'static'};
 rec.promise=new Promise((resolve,reject)=>{
 img.addEventListener('load',()=>{rec.state='ready';resolve(img)},{once:true});
 img.addEventListener('error',()=>{
+if(rec.disposed)return;
 if(rec.source==='static'){
 rec.source='google-jpeg';
 img.src=googleSlideImageUrl(item,'jpeg');
@@ -167,44 +179,16 @@ mobileImageCache.set(index,rec);
 img.src=slideImageUrl(item);
 return rec;
 }
-function trimMobileImageCache(center){
-if(!isMobile)return;
-const min=Math.max(0,center-MOBILE_CACHE_BEHIND);
-const max=Math.min(slides.length-1,center+MOBILE_PREFETCH_AHEAD+2);
+function trimImageCache(center){
+const behind=isMobile?3:8;
+const ahead=isMobile?7:12;
 for(const [i,rec] of [...mobileImageCache]){
-if((i<min||i>max)&&!rec.img.parentNode){
-try{rec.img.src=''}catch(_){}
+if((i<center-behind||i>center+ahead)&&!rec.img.parentNode){
+rec.disposed=true;
+rec.img.removeAttribute('src');
 mobileImageCache.delete(i);
 }
 }
-}
-function warmMobileImages(center,epoch){
-if(!isMobile)return;
-for(let i=center+1;i<=Math.min(slides.length-1,center+MOBILE_PREFETCH_AHEAD);i++){
-const item=slides[i];
-if(VIDEO_SLIDES.has(item.project.presentationId+':'+item.slideId))continue;
-setTimeout(()=>{
-if(epoch!==preloadEpoch||document.visibilityState!=='visible')return;
-prepareMobileImage(item,i,i<=center+2?'high':'low');
-},Math.min(700,(i-center-1)*70));
-}
-for(let i=Math.max(0,center-MOBILE_CACHE_BEHIND);i<center;i++){
-prepareMobileImage(slides[i],i,'low');
-}
-trimMobileImageCache(center);
-}
-function deepPrefetchMobile(center,epoch){
-if(!isMobile||!navigator.serviceWorker?.controller)return;
-setTimeout(()=>{
-if(epoch!==preloadEpoch||document.visibilityState!=='visible')return;
-const urls=[];
-for(let i=center+MOBILE_DEEP_PREFETCH_START;i<=Math.min(slides.length-1,center+MOBILE_DEEP_PREFETCH_END);i++){
-const item=slides[i];
-if(VIDEO_SLIDES.has(item.project.presentationId+':'+item.slideId))continue;
-urls.push(slideImageUrl(item));
-}
-if(urls.length)navigator.serviceWorker.controller.postMessage({type:'PREFETCH_SLIDES',urls});
-},1200);
 }
 
 function updateCounter(i){
@@ -213,7 +197,6 @@ const s=slides[current];
 counter.textContent=s.project.name+' · '+(s.localIndex+1)+' / '+s.project.slideIds.length;
 scrubberRange.value=String(current);
 scrubberLabel.textContent=s.project.name+' · '+(s.localIndex+1)+' / '+s.project.slideIds.length;
-try{localStorage.setItem(PROGRESS_KEY,JSON.stringify({key:s.project.presentationId+':'+s.slideId,index:current,ts:Date.now()}));}catch(_){}
 }
 
 function makeLoading(text='LOADING',retry=false){
@@ -296,6 +279,7 @@ mounted.delete(index);
 };
 
 section._mount=(attempt=0,forceIframe=false)=>{
+if(isVideo&&Math.abs(index-current)>1)return;
 if(stage.querySelector('iframe,img.slide-image'))return;
 mounted.add(index);
 const generation=++section._generation;
@@ -386,6 +370,7 @@ scroller.appendChild(section);
 let preloadEpoch=0;
 function mountWindow(center){
 const epoch=++preloadEpoch;
+trimImageCache(center);
 const start=Math.max(0,center-KEEP_BEHIND);
 const end=Math.min(slides.length-1,center+KEEP_AHEAD);
 if(!isMobile){
@@ -520,16 +505,22 @@ else if(e.key==='Home'){e.preventDefault();go(0)}
 else if(e.key==='End'){e.preventDefault();go(slides.length-1)}
 });
 
-document.addEventListener('visibilitychange',()=>{
-if(document.visibilityState==='visible')mountWindow(current);
-});
-window.addEventListener('pageshow',()=>{mountWindow(current);});
-window.addEventListener('pagehide',()=>{
+function saveProgress(){
 try{
 const s=slides[current];
-if(s)localStorage.setItem(PROGRESS_KEY,JSON.stringify({key:s.project.presentationId+':'+s.slideId,index:current,ts:Date.now()}));
+if(s)localStorage.setItem(PROGRESS_KEY,JSON.stringify({
+key:s.project.presentationId+':'+s.slideId,
+index:current,
+ts:Date.now()
+}));
 }catch(_){}
+}
+document.addEventListener('visibilitychange',()=>{
+if(document.visibilityState==='hidden')saveProgress();
+else mountWindow(current);
 });
+window.addEventListener('pageshow',()=>{mountWindow(current);});
+window.addEventListener('pagehide',saveProgress);
 
 const root=document.documentElement;
 const doc=document;
@@ -555,17 +546,14 @@ doc.addEventListener('fullscreenchange',syncFs);
 doc.addEventListener('webkitfullscreenchange',syncFs);
 }
 
-const projectSignature=projects=>JSON.stringify(projects.map(p=>[p.name,p.presentationId,p.slideIds]));
-const cached=cachedProjects();
-if(cached.length){
-render(cached);
-fetchFreshProjects().catch(()=>{});
-}else{
 fetchFreshProjects().then(render).catch(()=>{
+const cached=cachedProjects();
+if(cached.length)render(cached);
+else{
 app.innerHTML='<div class="status retry">PORTFOLIO TEMPORARILY UNAVAILABLE<br><br>TAP TO RETRY</div>';
 app.firstElementChild.addEventListener('click',()=>location.reload());
-});
 }
+});
 })();
 </script>
 </body>

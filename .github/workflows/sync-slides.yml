@@ -29,7 +29,7 @@ jobs:
           CONTROL_URL: https://script.google.com/macros/s/AKfycbyIlZriI8wvw-VWHWkUva8TSCvmYn04JCAyoGbnRqNWpIvRMjS7BmApbIGm_0spKqkMAw/exec
         run: |
           python3 - <<'PY'
-          import concurrent.futures, json, os, pathlib, time, urllib.parse, urllib.request
+          import concurrent.futures, hashlib, json, os, pathlib, time, urllib.parse, urllib.request
 
           CONTROL_URL=os.environ['CONTROL_URL']
           VIDEO={
@@ -98,15 +98,39 @@ jobs:
               if n%50==0:
                 print(f'{n}/{len(jobs)} rendered; failures={len(failures)}')
 
+          digest=hashlib.sha256()
+          digest.update(json.dumps(projects,separators=(',',':'),ensure_ascii=False).encode('utf-8'))
+          for pid,sid in sorted(jobs):
+            target=root/pid/(sid+'.jpg')
+            if target.exists():
+              digest.update(pid.encode('utf-8'))
+              digest.update(b'\0')
+              digest.update(sid.encode('utf-8'))
+              digest.update(b'\0')
+              with target.open('rb') as fh:
+                for chunk in iter(lambda: fh.read(1024*1024),b''):
+                  digest.update(chunk)
+          asset_version=digest.hexdigest()[:16]
+
+          manifest_path=pathlib.Path('assets/slide-manifest.json')
+          previous={}
+          if manifest_path.exists():
+            try:
+              previous=json.loads(manifest_path.read_text(encoding='utf-8'))
+            except Exception:
+              previous={}
+          generated_at=previous.get('generatedAt') if previous.get('assetVersion')==asset_version else int(time.time()*1000)
+
           manifest={
             'ok': True,
-            'generatedAt': int(time.time()*1000),
+            'assetVersion': asset_version,
+            'generatedAt': generated_at,
             'projects': projects,
             'videos': sorted(VIDEO),
             'rendered': len(jobs)-len(failures),
             'failed': failures,
           }
-          pathlib.Path('assets/slide-manifest.json').write_text(json.dumps(manifest,separators=(',',':')),encoding='utf-8')
+          manifest_path.write_text(json.dumps(manifest,separators=(',',':')),encoding='utf-8')
           print(f'Finished: {manifest["rendered"]}/{len(jobs)} JPEGs, {total_bytes/1024/1024:.1f} MB downloaded')
           if failures:
             print('Failures:',json.dumps(failures[:30],indent=2))

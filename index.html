@@ -79,7 +79,9 @@ const lowMemory=memoryGB>0&&memoryGB<=4;
 const KEEP_BEHIND=isMobile?2:1;
 const KEEP_AHEAD=isMobile?3:(lowMemory?3:5);
 const IDLE_AHEAD=isMobile?0:(lowMemory?1:2);
-const MOBILE_LOAD_DELAY=120;
+const MOBILE_LOAD_DELAY=90;
+const MOBILE_PREFETCH_AHEAD=10;
+const MOBILE_CACHE_BEHIND=3;
 const PROGRESS_KEY='archivePortfolioProgress';
 app.innerHTML='<div class="status">LOADING PORTFOLIO</div>';
 
@@ -119,6 +121,64 @@ scrubberRange.max=String(Math.max(0,slides.length-1));
 const sections=[];
 const mounted=new Set();
 let current=0;
+const mobileImageCache=new Map();
+
+function slideImageUrl(item,format='jpeg'){
+return 'https://docs.google.com/presentation/d/'+item.project.presentationId+'/export/'+format+'?id='+item.project.presentationId+'&pageid='+item.slideId;
+}
+function prepareMobileImage(item,index,priority='low'){
+if(!isMobile||VIDEO_SLIDES.has(item.project.presentationId+':'+item.slideId))return null;
+let rec=mobileImageCache.get(index);
+if(rec)return rec;
+const img=new Image();
+img.className='slide-image';
+img.alt=item.project.name+' slide '+(item.localIndex+1);
+img.decoding='async';
+img.loading='eager';
+try{img.fetchPriority=priority}catch(_){}
+rec={img,state:'loading',format:'jpeg'};
+rec.promise=new Promise((resolve,reject)=>{
+img.addEventListener('load',()=>{rec.state='ready';resolve(img)},{once:true});
+img.addEventListener('error',()=>{
+if(rec.format==='jpeg'){
+rec.format='png';
+img.src=slideImageUrl(item,'png');
+return;
+}
+rec.state='error';
+reject(new Error('image'));
+},{once:false});
+});
+mobileImageCache.set(index,rec);
+img.src=slideImageUrl(item,'jpeg');
+return rec;
+}
+function trimMobileImageCache(center){
+if(!isMobile)return;
+const min=Math.max(0,center-MOBILE_CACHE_BEHIND);
+const max=Math.min(slides.length-1,center+MOBILE_PREFETCH_AHEAD+2);
+for(const [i,rec] of [...mobileImageCache]){
+if((i<min||i>max)&&!rec.img.parentNode){
+try{rec.img.src=''}catch(_){}
+mobileImageCache.delete(i);
+}
+}
+}
+function warmMobileImages(center,epoch){
+if(!isMobile)return;
+for(let i=center+1;i<=Math.min(slides.length-1,center+MOBILE_PREFETCH_AHEAD);i++){
+const item=slides[i];
+if(VIDEO_SLIDES.has(item.project.presentationId+':'+item.slideId))continue;
+setTimeout(()=>{
+if(epoch!==preloadEpoch||document.visibilityState!=='visible')return;
+prepareMobileImage(item,i,i<=center+2?'high':'low');
+},Math.min(700,(i-center-1)*70));
+}
+for(let i=Math.max(0,center-MOBILE_CACHE_BEHIND);i<center;i++){
+prepareMobileImage(slides[i],i,'low');
+}
+trimMobileImageCache(center);
+}
 
 function updateCounter(i){
 current=Math.max(0,Math.min(slides.length-1,i));
@@ -214,26 +274,27 @@ stage.replaceChildren(retry);
 };
 
 if(isMobile&&!isVideo&&!forceIframe){
-const img=document.createElement('img');
-img.className='slide-image';
-img.alt=item.project.name+' slide '+(item.localIndex+1);
-img.decoding='async';
-img.loading='eager';
-img.src='https://docs.google.com/presentation/d/'+item.project.presentationId+'/export/png?id='+item.project.presentationId+'&pageid='+item.slideId;
-img.addEventListener('load',()=>done(img),{once:true});
-img.addEventListener('error',()=>{
+const rec=prepareMobileImage(item,index,index===current?'high':'auto');
+const img=rec.img;
+stage.appendChild(img);
+if(rec.state==='ready'||(img.complete&&img.naturalWidth)){
+done(img);
+}else{
+rec.promise.then(()=>{
+if(section._generation===generation&&img.parentNode===stage)done(img);
+}).catch(()=>{
 if(section._generation!==generation)return;
 if(section._timer)clearTimeout(section._timer);
 section._timer=null;
 img.remove();
 mountIframe();
-},{once:true});
-stage.appendChild(img);
+});
 section._timer=setTimeout(()=>{
 if(section._generation!==generation||img.classList.contains('is-ready'))return;
 img.remove();
 mountIframe();
-},6500);
+},5500);
+}
 }else{
 mountIframe();
 }
@@ -255,12 +316,15 @@ const end=Math.min(slides.length-1,center+KEEP_AHEAD);
 for(const i of [...mounted]){
 if(i<start||i>end+IDLE_AHEAD)sections[i]._unmount();
 }
+if(isMobile&&slides[center])prepareMobileImage(slides[center],center,'high');
+if(isMobile&&slides[center+1]&&!VIDEO_SLIDES.has(slides[center+1].project.presentationId+':'+slides[center+1].slideId))prepareMobileImage(slides[center+1],center+1,'high');
 sections[center]?._mount();
 if(isMobile){
 for(let i=Math.max(start,center-1);i<=Math.min(end,center+1);i++)if(i!==center)sections[i]._mount();
 for(let i=center+2;i<=end;i++)setTimeout(()=>{
 if(epoch===preloadEpoch&&document.visibilityState==='visible')sections[i]._mount();
 },(i-center-1)*MOBILE_LOAD_DELAY);
+warmMobileImages(center,epoch);
 return;
 }
 if(center+1<=end)sections[center+1]._mount();

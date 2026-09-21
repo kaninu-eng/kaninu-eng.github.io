@@ -1,4 +1,4 @@
-const CACHE='archive-slide-cache-v3';
+const CACHE='archive-slide-cache-v4';
 const MAX_ENTRIES=320;
 
 self.addEventListener('install',()=>self.skipWaiting());
@@ -15,13 +15,13 @@ self.addEventListener('activate',event=>{
   })());
 });
 
-function isLocalSlideImage(request){
+function isSlideImage(request){
   if(request.method!=='GET')return false;
   try{
     const u=new URL(request.url);
     return u.origin===self.location.origin &&
       u.pathname.startsWith('/assets/slides/') &&
-      u.pathname.endsWith('.jpg');
+      /\.(jpe?g|webp|avif)$/i.test(u.pathname);
   }catch(_){
     return false;
   }
@@ -35,7 +35,8 @@ async function trim(cache){
 }
 
 self.addEventListener('fetch',event=>{
-  if(!isLocalSlideImage(event.request))return;
+  if(!isSlideImage(event.request))return;
+
   event.respondWith((async()=>{
     const cache=await caches.open(CACHE);
     const cached=await cache.match(event.request);

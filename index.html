@@ -5,30 +5,33 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <link rel="icon" href="data:,">
-<meta name="description" content="ARCHIVE STUDIO — selected architecture and design portfolio.">
 <title>ARCHIVE Portfolio</title>
 <style>
+:root{--dvh:100vh}
+@supports (height:100dvh){:root{--dvh:100dvh}}
+@media(max-width:900px){@supports (height:100svh){:root{--dvh:100svh}}}
 html,body,#app{width:100%;height:100%;margin:0;overflow:hidden;background:#000}
-body{font-family:Arial,Helvetica,sans-serif}
+body{font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 *{box-sizing:border-box}
-.viewer{width:100vw;height:100dvh;position:relative;overflow:hidden;background:#000;color:#aaa;user-select:none}
-.portfolio-scroll{width:100%;height:100%;overflow-x:hidden;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior-y:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+.viewer{width:100%;height:100vh;height:var(--dvh);position:relative;overflow:hidden;background:#000;color:#aaa;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.portfolio-scroll{position:relative;width:100%;height:100%;overflow-x:hidden;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior-y:contain;scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
 .portfolio-scroll::-webkit-scrollbar{display:none}
-.portfolio-page{width:100%;height:100dvh;min-height:100dvh;display:flex;align-items:center;justify-content:center;scroll-snap-align:start;scroll-snap-stop:normal;background:#000;contain:layout paint style;content-visibility:auto;contain-intrinsic-size:auto 100dvh}
-.slide-stage{--slide-ratio:2.41351;width:min(100vw,calc(100dvh * var(--slide-ratio)));aspect-ratio:var(--slide-ratio);max-height:100dvh;position:relative;overflow:hidden;background:#fff}
+.portfolio-page{width:100%;height:100vh;height:var(--dvh);min-height:100vh;min-height:var(--dvh);display:flex;align-items:center;justify-content:center;scroll-snap-align:start;scroll-snap-stop:normal;background:#000;padding:0 env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px);contain:layout paint style;content-visibility:auto;contain-intrinsic-size:auto 100vh;contain-intrinsic-size:auto var(--dvh)}
+.slide-stage{--slide-ratio:2.41351;flex:none;width:min(100%,calc(var(--dvh) * var(--slide-ratio)));aspect-ratio:var(--slide-ratio);max-height:100vh;max-height:var(--dvh);position:relative;overflow:hidden;background:#fff}
 .loading-label{position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;background:#fff;color:#aaa;font-size:10px;letter-spacing:.18em;pointer-events:none}
 .loading-label.retry{pointer-events:auto;cursor:pointer}
 .slide-frame{position:absolute;inset:-2px;width:calc(100% + 4px);height:calc(100% + 4px);border:0;background:#000;opacity:0;pointer-events:none}
 .slide-image{position:absolute;inset:-1px;width:calc(100% + 2px);height:calc(100% + 2px);object-fit:fill;display:block;background:#000;opacity:0}
 .slide-image.is-ready{opacity:1}
-@media(max-width:900px){.slide-image{content-visibility:auto}}
+.slide-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;background:#000;opacity:0}
+.slide-video.is-ready{opacity:1}
 .slide-frame.is-ready{opacity:1}
 .slide-frame.is-video{pointer-events:auto}
 .scroll-shield{position:absolute;inset:0;z-index:2;background:transparent;touch-action:pan-y pinch-zoom}
 .video-scroll-edges{position:absolute;inset:0;z-index:2;pointer-events:none}
 .video-edge{position:absolute;pointer-events:auto;background:transparent;touch-action:pan-y pinch-zoom;top:8%;bottom:18%;width:7%}
 .video-edge-left{left:0}.video-edge-right{right:0}
-.counter{position:fixed;right:16px;bottom:max(14px,env(safe-area-inset-bottom));z-index:5;font-size:10px;letter-spacing:.08em;color:rgba(190,190,190,.72);pointer-events:none}
+.counter{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom));z-index:5;font-size:10px;letter-spacing:.08em;color:rgba(190,190,190,.72);pointer-events:none}
 .fullscreen-button{position:fixed;left:50%;bottom:max(12px,env(safe-area-inset-bottom));z-index:6;width:48px;height:48px;transform:translateX(-50%);border:0;border-radius:4px;padding:0;background:rgba(0,0,0,.22);color:rgba(220,220,220,.72);font:26px/48px Arial,Helvetica,sans-serif;text-align:center;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .fullscreen-button:hover,.fullscreen-button:focus-visible{color:#fff;background:rgba(0,0,0,.36);outline:none}
 .status{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;color:#777;font-size:11px;letter-spacing:.14em;z-index:10;text-align:center;padding:24px}
@@ -41,16 +44,16 @@ body{font-family:Arial,Helvetica,sans-serif}
 .viewer:not(.is-fullscreen) .fullscreen-button{bottom:max(48px,calc(env(safe-area-inset-bottom) + 48px))}
 .viewer:not(.is-fullscreen) .counter{bottom:max(54px,calc(env(safe-area-inset-bottom) + 54px))}
 @media(max-width:900px){
-.viewer,.portfolio-scroll{height:100vh;height:100svh}
+.viewer,.portfolio-scroll{height:100vh;height:var(--dvh)}
 .portfolio-scroll{scroll-behavior:auto;touch-action:pan-y pinch-zoom;scroll-snap-type:none;padding-bottom:58px}
-.portfolio-page{height:auto;min-height:0;content-visibility:visible;contain:layout paint style;scroll-snap-align:none;padding:1px 0}
-.slide-stage{max-height:none;width:100vw}
+.portfolio-page{height:auto;min-height:0;content-visibility:visible;contain:layout paint style;scroll-snap-align:none;padding:1px env(safe-area-inset-right,0px) 1px env(safe-area-inset-left,0px)}
+.slide-stage{max-height:none;width:100%}
 .viewer.is-fullscreen .portfolio-scroll{scroll-snap-type:y mandatory;padding-bottom:0}
-.viewer.is-fullscreen .portfolio-page{height:100vh;min-height:100vh;height:100svh;min-height:100svh;scroll-snap-align:start;padding:0}
-.viewer.is-fullscreen .slide-stage{width:min(100vw,calc(100svh * var(--slide-ratio)));max-height:100svh}
-.scrubber{width:calc(100vw - 24px);bottom:max(6px,env(safe-area-inset-bottom));padding:5px 10px 6px}
+.viewer.is-fullscreen .portfolio-page{height:100vh;height:var(--dvh);min-height:100vh;min-height:var(--dvh);scroll-snap-align:start;padding:0 env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px)}
+.viewer.is-fullscreen .slide-stage{width:min(100%,calc(var(--dvh) * var(--slide-ratio)));max-height:100vh;max-height:var(--dvh)}
+.scrubber{width:calc(100vw - 24px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));bottom:max(6px,env(safe-area-inset-bottom));padding:5px 10px 6px}
 .scrubber-label{font-size:9px}
-.counter{right:12px}
+.counter{right:max(12px,env(safe-area-inset-right,0px))}
 .fullscreen-button{width:46px;height:46px;font-size:25px;line-height:46px}
 .viewer:not(.is-fullscreen) .fullscreen-button{bottom:max(45px,calc(env(safe-area-inset-bottom) + 45px))}
 .viewer:not(.is-fullscreen) .counter{bottom:max(50px,calc(env(safe-area-inset-bottom) + 50px))}
@@ -60,6 +63,7 @@ body{font-family:Arial,Helvetica,sans-serif}
 </head>
 <body>
 <div id="app"></div>
+<noscript><p style="color:#aaa;font:12px Arial,sans-serif;letter-spacing:.14em;text-align:center;padding:24px">PLEASE ENABLE JAVASCRIPT TO VIEW THE PORTFOLIO</p></noscript>
 <script>
 (()=>{
 const CONTROL_URL='https://script.google.com/macros/s/AKfycbyIlZriI8wvw-VWHWkUva8TSCvmYn04JCAyoGbnRqNWpIvRMjS7BmApbIGm_0spKqkMAw/exec';
@@ -71,6 +75,12 @@ const VIDEO_SLIDES=new Set([
 '154LAAGv-ZC_tndMA8ZZsOid7MXX75is3U0dn1Wnux0o:g3fb98553a14_0_0',
 '1QRraD6xGY3ED4U-hVZOSh6QHXjOh4zle8fO1zhSKfvo:g3fb9b795649_0_115'
 ]);
+// Optional: self-hosted MP4 files for video slides. Native <video> starts far faster than Google's
+// slide embed. Key = presentationId + ':' + slideId, value = path to the .mp4 (see notes).
+// If a file is missing or fails, the slide automatically falls back to the Google embed.
+const VIDEO_FILES={
+// '1ZdriVfkQNIfcbwqQ9zNGcxKRHwC4YhKI_zsSa5ewxgc:g3b773260940_0_54':'/assets/videos/project-1.mp4',
+};
 const app=document.getElementById('app');
 const isMobile=matchMedia('(max-width:900px)').matches || (navigator.maxTouchPoints>0 && matchMedia('(pointer:coarse)').matches);
 const memoryGB=Number(navigator.deviceMemory||0);
@@ -78,10 +88,16 @@ const lowMemory=memoryGB>0&&memoryGB<=4;
 const KEEP_BEHIND=isMobile?2:1;
 const KEEP_AHEAD=isMobile?3:(lowMemory?3:5);
 const IDLE_AHEAD=isMobile?0:(lowMemory?1:2);
+const VIDEO_BEHIND=1;
+const VIDEO_AHEAD=1;
 const PROGRESS_KEY='archivePortfolioProgress';
+let assetVersion='1';
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(_){return null}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(_){}};
 app.innerHTML='<div class="status">LOADING PORTFOLIO</div>';
 if('serviceWorker' in navigator){
-navigator.serviceWorker.register('/sw.js').then(()=>navigator.serviceWorker.ready).catch(()=>{});
+const regSW=()=>navigator.serviceWorker.register('/sw.js').catch(()=>{});
+if(document.readyState==='complete')regSW();else window.addEventListener('load',regSW,{once:true});
 }
 
 const normalize=projects=>(projects||[]).flatMap(p=>{
@@ -90,10 +106,9 @@ const slideIds=p.slideIds.filter(id=>id&&!MENU_SLIDE_IDS.has(id));
 return slideIds.length?[{name:p.name,presentationId:p.presentationId,slideIds}]:[];
 });
 
-let assetVersion='1';
 function cachedProjects(){
 try{
-const raw=JSON.parse(localStorage.getItem('archivePortfolioFeed')||'[]');
+const raw=JSON.parse(lsGet('archivePortfolioFeed')||'[]');
 if(raw&&raw.assetVersion)assetVersion=String(raw.assetVersion);
 return normalize(Array.isArray(raw)?raw:(raw.projects||[]));
 }catch(_){return[]}
@@ -104,23 +119,20 @@ if(!r.ok)throw new Error('feed');
 const data=await r.json();
 const projects=normalize(data.projects);
 if(!data.ok||!projects.length)throw new Error('feed');
-if(data.assetVersion)assetVersion=String(data.assetVersion);
-return {projects,assetVersion};
+return {projects,assetVersion:data.assetVersion?String(data.assetVersion):assetVersion};
 }
 async function fetchFreshProjects(){
 let result;
-try{
-result=await loadFeed('/assets/slide-manifest.json',{cache:'no-cache'});
-}catch(_){
-result=await loadFeed(CONTROL_URL+'?t='+Date.now(),{cache:'no-store'});
-}
-try{
-localStorage.setItem('archivePortfolioFeed',JSON.stringify({
+// Primary source: same-origin static manifest generated with the slide cache.
+try{result=await loadFeed('/assets/slide-manifest.json',{cache:'no-cache'})}
+// Emergency fallback only: live Apps Script control feed.
+catch(_){result=await loadFeed(CONTROL_URL+'?t='+Date.now(),{cache:'no-store'})}
+assetVersion=result.assetVersion||assetVersion;
+lsSet('archivePortfolioFeed',JSON.stringify({
 projects:result.projects,
-assetVersion:result.assetVersion||assetVersion,
+assetVersion,
 savedAt:Date.now()
 }));
-}catch(_){}
 return result.projects;
 }
 
@@ -138,7 +150,15 @@ scrubberRange.max=String(Math.max(0,slides.length-1));
 const sections=[];
 const mounted=new Set();
 let current=0;
-const mobileImageCache=new Map();
+let focus=0;                       // centre of the last mountWindow()
+let scrolling=false,pendingVideo=false;
+const imageCache=new Map();
+const isVid=i=>{const x=slides[i];return !!x&&VIDEO_SLIDES.has(x.project.presentationId+':'+x.slideId)};
+const videoInRange=(i,c,slack=0)=>{const d=i-c;return d>=-(VIDEO_BEHIND+slack)&&d<=VIDEO_AHEAD+slack};
+// pause a playing video as soon as it scrolls out of view
+const videoObserver=('IntersectionObserver' in window)?new IntersectionObserver(es=>{
+for(const e of es){if(!e.isIntersecting&&e.target.pause)e.target.pause()}
+},{root:scroller,threshold:.25}):{observe(){},unobserve(){}};
 
 function slideImageUrl(item){
 return '/assets/slides/'+encodeURIComponent(item.project.presentationId)+'/'+encodeURIComponent(item.slideId)+'.jpg?v='+encodeURIComponent(assetVersion);
@@ -146,9 +166,9 @@ return '/assets/slides/'+encodeURIComponent(item.project.presentationId)+'/'+enc
 function googleSlideImageUrl(item,format='jpeg'){
 return 'https://docs.google.com/presentation/d/'+item.project.presentationId+'/export/'+format+'?id='+item.project.presentationId+'&pageid='+item.slideId;
 }
-function prepareMobileImage(item,index,priority='low'){
+function prepareImage(item,index,priority='low'){
 if(VIDEO_SLIDES.has(item.project.presentationId+':'+item.slideId))return null;
-let rec=mobileImageCache.get(index);
+let rec=imageCache.get(index);
 if(rec)return rec;
 const img=new Image();
 img.className='slide-image';
@@ -156,7 +176,7 @@ img.alt=item.project.name+' slide '+(item.localIndex+1);
 img.decoding='async';
 img.loading='eager';
 try{img.fetchPriority=priority}catch(_){}
-rec={img,state:'loading',source:'static'};
+rec={img,state:'loading',source:'static',disposed:false};
 rec.promise=new Promise((resolve,reject)=>{
 img.addEventListener('load',()=>{rec.state='ready';resolve(img)},{once:true});
 img.addEventListener('error',()=>{
@@ -175,18 +195,18 @@ rec.state='error';
 reject(new Error('image'));
 },{once:false});
 });
-mobileImageCache.set(index,rec);
+imageCache.set(index,rec);
 img.src=slideImageUrl(item);
 return rec;
 }
+// forget images far from the reader so memory does not grow while scrolling
 function trimImageCache(center){
-const behind=isMobile?3:8;
-const ahead=isMobile?7:12;
-for(const [i,rec] of [...mobileImageCache]){
+const behind=isMobile?3:8,ahead=isMobile?7:12;
+for(const [i,rec] of [...imageCache]){
 if((i<center-behind||i>center+ahead)&&!rec.img.parentNode){
 rec.disposed=true;
 rec.img.removeAttribute('src');
-mobileImageCache.delete(i);
+imageCache.delete(i);
 }
 }
 }
@@ -228,8 +248,8 @@ const img=document.createElement('img');
 img.className='slide-image';
 img.alt=item.project.name+' slide '+(item.localIndex+1);
 img.decoding='async';
-img.loading=index<3?'eager':'lazy';
-try{img.fetchPriority=index<2?'high':'auto'}catch(_){}
+img.loading=Math.abs(index-initialIndex)<3?'eager':'lazy';
+try{img.fetchPriority=Math.abs(index-initialIndex)<2?'high':'auto'}catch(_){}
 img.dataset.source='static';
 
 const ready=()=>{
@@ -252,7 +272,7 @@ const retry=makeLoading('TAP TO RETRY',true);
 retry.addEventListener('click',()=>{
 img.dataset.source='static';
 stage.replaceChildren(img);
-img.src=slideImageUrl(item)+'?retry='+Date.now();
+img.src=slideImageUrl(item)+'&retry='+Date.now();
 },{once:true});
 stage.replaceChildren(retry);
 },{once:false});
@@ -279,8 +299,12 @@ mounted.delete(index);
 };
 
 section._mount=(attempt=0,forceIframe=false)=>{
-if(isVideo&&Math.abs(index-current)>1)return;
-if(stage.querySelector('iframe,img.slide-image'))return;
+if(stage.querySelector('iframe,img.slide-image,video.slide-video'))return;
+if(isVideo){
+// only build heavy video players near the reader, and not in the middle of a fast scroll
+if(!videoInRange(index,focus))return;
+if(scrolling&&index!==focus){pendingVideo=true;return}
+}
 mounted.add(index);
 const generation=++section._generation;
 if(section._timer)clearTimeout(section._timer);
@@ -329,11 +353,34 @@ const retry=makeLoading('TAP TO RETRY',true);
 retry.addEventListener('click',()=>{section._unmount();section._mount(0,isVideo)},{once:true});
 stage.replaceChildren(retry);
 }
-},isMobile?9000:15000);
+},isVideo?30000:(isMobile?9000:15000));
+};
+
+const mountVideoFile=src=>{
+if(section._generation!==generation)return;
+const v=document.createElement('video');
+v.className='slide-video';
+v.controls=true;
+v.playsInline=true;
+v.setAttribute('playsinline','');
+v.setAttribute('webkit-playsinline','');
+v.preload='metadata';
+v.poster=slideImageUrl(item);
+v.setAttribute('aria-label',item.project.name+' video');
+v.addEventListener('error',()=>{
+if(section._generation!==generation||!v.parentNode)return;
+videoObserver.unobserve(v);
+v.remove();
+mountIframe();
+},{once:true});
+v.src=src;
+stage.appendChild(v);
+videoObserver.observe(v);
+done(v);
 };
 
 if(!isVideo&&!forceIframe){
-const rec=prepareMobileImage(item,index,index===current?'high':'auto');
+const rec=prepareImage(item,index,index===current?'high':'auto');
 const img=rec.img;
 stage.appendChild(img);
 if(rec.state==='ready'||(img.complete&&img.naturalWidth)){
@@ -354,12 +401,23 @@ img.remove();
 mountIframe();
 },5500);
 }
+}else if(isVideo&&VIDEO_FILES[key]&&!forceIframe){
+mountVideoFile(VIDEO_FILES[key]);
 }else{
 mountIframe();
 }
 };
 return section;
 }
+
+let initialIndex=0;
+try{
+const saved=JSON.parse(lsGet(PROGRESS_KEY)||'null');
+if(saved&&Date.now()-Number(saved.ts||0)<7*24*60*60*1000){
+const byKey=slides.findIndex(x=>x.project.presentationId+':'+x.slideId===saved.key);
+initialIndex=byKey>=0?byKey:Math.max(0,Math.min(slides.length-1,Number(saved.index||0)));
+}
+}catch(_){}
 
 slides.forEach((item,i)=>{
 const section=makeSlide(item,i);
@@ -368,28 +426,42 @@ scroller.appendChild(section);
 });
 
 let preloadEpoch=0;
+let videoWarmed=false;
+// open the connection to Google early when a Google-embedded video is coming up
+function warmGoogle(center){
+if(videoWarmed)return;
+for(let i=Math.max(0,center-1);i<=Math.min(slides.length-1,center+2);i++){
+if(isVid(i)&&!VIDEO_FILES[slides[i].project.presentationId+':'+slides[i].slideId]){
+videoWarmed=true;
+const l=document.createElement('link');
+l.rel='preconnect';
+l.href='https://docs.google.com';
+document.head.appendChild(l);
+return;
+}
+}
+}
 function mountWindow(center){
+focus=center;
 const epoch=++preloadEpoch;
-trimImageCache(center);
 const start=Math.max(0,center-KEEP_BEHIND);
 const end=Math.min(slides.length-1,center+KEEP_AHEAD);
-if(!isMobile){
+trimImageCache(center);
+warmGoogle(center);
 for(const i of [...mounted]){
-if(i<start||i>end+IDLE_AHEAD)sections[i]._unmount();
+const outOfWindow=!isMobile&&(i<start||i>end+IDLE_AHEAD);
+if(outOfWindow||(isVid(i)&&!videoInRange(i,center,1)))sections[i]._unmount();
+}
+if(!isMobile){
+for(const i of [center,center+1]){
+if(slides[i]&&!isVid(i))prepareImage(slides[i],i,'high');
 }
 }
-if(!isMobile&&slides[center]&&!VIDEO_SLIDES.has(slides[center].project.presentationId+':'+slides[center].slideId))prepareMobileImage(slides[center],center,'high');
-if(!isMobile&&slides[center+1]&&!VIDEO_SLIDES.has(slides[center+1].project.presentationId+':'+slides[center+1].slideId))prepareMobileImage(slides[center+1],center+1,'high');
 sections[center]?._mount();
 if(isMobile){
-sections[center]?._mount();
-for(let i=Math.max(0,center-1);i<=Math.min(slides.length-1,center+1);i++){
-if(i===center)continue;
-const key=slides[i].project.presentationId+':'+slides[i].slideId;
-if(VIDEO_SLIDES.has(key))sections[i]._mount();
-}
-for(const i of [...mounted]){
-if(Math.abs(i-center)>1&&VIDEO_SLIDES.has(slides[i].project.presentationId+':'+slides[i].slideId))sections[i]._unmount();
+const vEnd=Math.min(slides.length-1,center+VIDEO_AHEAD);
+for(let i=Math.max(0,center-VIDEO_BEHIND);i<=vEnd;i++){
+if(i!==center&&isVid(i))sections[i]._mount();
 }
 return;
 }
@@ -429,9 +501,7 @@ mountWindow(i);
 },{root:scroller,threshold:[.58]});
 sections.forEach(s=>{if(!isMobile){predictive.observe(s);active.observe(s)}});
 
-if(isMobile){
-let scrollRaf=0;
-const findCenterIndex=()=>{
+function findCenterIndex(){
 const target=scroller.scrollTop+scroller.clientHeight/2;
 let lo=0,hi=sections.length-1;
 while(lo<hi){
@@ -448,27 +518,89 @@ const db=Math.abs((b.offsetTop+b.offsetHeight/2)-target);
 if(da<db)best--;
 }
 return best;
-};
+}
+// the section at the top edge of the screen
+function topIndex(){
+const y=scroller.scrollTop+1;
+let lo=0,hi=sections.length-1;
+while(lo<hi){
+const mid=(lo+hi+1)>>1;
+if(sections[mid].offsetTop<=y)lo=mid;else hi=mid-1;
+}
+return lo;
+}
+// instant jump, even where CSS says scroll-behavior:smooth (works in every browser)
+function jumpTo(top){
+const st=scroller.style;
+st.scrollBehavior='auto';
+scroller.scrollTop=top;
+requestAnimationFrame(()=>{st.scrollBehavior=''});
+}
+
+// Remember WHICH slide (and how far into it) the reader is on, not a pixel offset.
+// When the screen rotates or the window is resized every slide changes height, so a pixel
+// offset points at a different slide. The anchor lets us land back on the same one.
+let anchor={i:initialIndex,f:0},restoring=false,restoreTimer=0,lastW=0,lastH=0;
+function saveAnchor(){
+if(restoring)return;
+if(scroller.clientWidth!==lastW||scroller.clientHeight!==lastH)return;
+const i=topIndex(),s=sections[i];
+anchor={i,f:Math.max(0,Math.min(1,(scroller.scrollTop-s.offsetTop)/(s.offsetHeight||1)))};
+}
+function restoreAnchor(){
+const s=sections[anchor.i];
+if(s)jumpTo(s.offsetTop+anchor.f*s.offsetHeight);
+}
+function onScrollerResize(){
+const w=scroller.clientWidth,h=scroller.clientHeight;
+if(w===lastW&&h===lastH)return;
+lastW=w;lastH=h;
+restoring=true;
+restoreAnchor();
+clearTimeout(restoreTimer);
+// some browsers (iOS Safari) report rotation in several steps, so settle again shortly after
+restoreTimer=setTimeout(()=>{
+restoreAnchor();
+restoring=false;
+saveAnchor();
+const c=findCenterIndex();
+updateCounter(c);
+mountWindow(c);
+},250);
+}
+// if the reader starts scrolling themselves, stop fighting them
+const cancelRestore=()=>{if(restoring){restoring=false;clearTimeout(restoreTimer)}};
+['wheel','touchstart','keydown','pointerdown'].forEach(t=>window.addEventListener(t,cancelRestore,{passive:true,capture:true}));
+
+let scrollRaf=0,scrollTimer=0;
 scroller.addEventListener('scroll',()=>{
+scrolling=true;
+clearTimeout(scrollTimer);
+scrollTimer=setTimeout(()=>{
+scrolling=false;
+if(pendingVideo&&!restoring){pendingVideo=false;mountWindow(current)}
+},160);
 if(scrollRaf)return;
 scrollRaf=requestAnimationFrame(()=>{
 scrollRaf=0;
+if(restoring)return;
+saveAnchor();
+if(isMobile){
 const i=findCenterIndex();
 if(i!==current){updateCounter(i);mountWindow(i)}
+}
 });
 },{passive:true});
-}
-let initialIndex=0;
-try{
-const saved=JSON.parse(localStorage.getItem(PROGRESS_KEY)||'null');
-if(saved&&Date.now()-Number(saved.ts||0)<7*24*60*60*1000){
-const byKey=slides.findIndex(s=>s.project.presentationId+':'+s.slideId===saved.key);
-initialIndex=byKey>=0?byKey:Math.max(0,Math.min(slides.length-1,Number(saved.index||0)));
-}
-}catch(_){}
+
 updateCounter(initialIndex);
 mountWindow(initialIndex);
-if(initialIndex>0)requestAnimationFrame(()=>{scroller.scrollTop=sections[initialIndex]?.offsetTop||0;});
+if(initialIndex>0){
+jumpTo(sections[initialIndex]?.offsetTop||0);
+requestAnimationFrame(()=>jumpTo(sections[initialIndex]?.offsetTop||0));
+}
+lastW=scroller.clientWidth;lastH=scroller.clientHeight;
+if('ResizeObserver' in window)new ResizeObserver(onScrollerResize).observe(scroller);
+else window.addEventListener('resize',onScrollerResize);
 
 function labelFor(i){
 const n=Math.max(0,Math.min(slides.length-1,Number(i)||0));
@@ -487,7 +619,7 @@ const n=Math.max(0,Math.min(slides.length-1,Number(scrubberRange.value)||0));
 scrubbing=false;
 updateCounter(n);
 mountWindow(n);
-scroller.scrollTo({top:sections[n]?.offsetTop||0,behavior:'auto'});
+jumpTo(sections[n]?.offsetTop||0);
 }
 scrubberRange.addEventListener('change',commitScrub);
 scrubberRange.addEventListener('pointerup',commitScrub);
@@ -499,6 +631,8 @@ mountWindow(n);
 scroller.scrollTo({top:sections[n]?.offsetTop||0,behavior:isMobile?'auto':'smooth'});
 }
 window.addEventListener('keydown',e=>{
+const t=e.target&&e.target.tagName;
+if(t==='INPUT'||t==='BUTTON'||t==='VIDEO'||t==='IFRAME')return;
 if(['ArrowDown','PageDown',' '].includes(e.key)){e.preventDefault();go(current+1)}
 else if(['ArrowUp','PageUp'].includes(e.key)){e.preventDefault();go(current-1)}
 else if(e.key==='Home'){e.preventDefault();go(0)}
@@ -506,18 +640,12 @@ else if(e.key==='End'){e.preventDefault();go(slides.length-1)}
 });
 
 function saveProgress(){
-try{
 const s=slides[current];
-if(s)localStorage.setItem(PROGRESS_KEY,JSON.stringify({
-key:s.project.presentationId+':'+s.slideId,
-index:current,
-ts:Date.now()
-}));
-}catch(_){}
+if(s)lsSet(PROGRESS_KEY,JSON.stringify({key:s.project.presentationId+':'+s.slideId,index:current,ts:Date.now()}));
 }
 document.addEventListener('visibilitychange',()=>{
-if(document.visibilityState==='hidden')saveProgress();
-else mountWindow(current);
+if(document.visibilityState==='visible')mountWindow(current);
+else saveProgress();
 });
 window.addEventListener('pageshow',()=>{mountWindow(current);});
 window.addEventListener('pagehide',saveProgress);
@@ -537,7 +665,8 @@ else if(root.webkitRequestFullscreen)await root.webkitRequestFullscreen();
 function syncFs(){
 const on=!!(doc.fullscreenElement||doc.webkitFullscreenElement);
 viewer.classList.toggle('is-fullscreen',on);
-requestAnimationFrame(()=>{scroller.scrollTop=sections[current]?.offsetTop||0;mountWindow(current)});
+anchor={i:current,f:0};
+requestAnimationFrame(()=>{jumpTo(sections[current]?.offsetTop||0);mountWindow(current)});
 fs.textContent=on?'×':'⛶';
 fs.setAttribute('aria-label',on?'Exit fullscreen':'Enter fullscreen');
 fs.title=on?'Exit fullscreen':'Fullscreen';
